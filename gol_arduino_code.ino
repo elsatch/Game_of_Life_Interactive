@@ -2,12 +2,31 @@
 #include <MaxMatrix.h>
 
 
-//Proximity sensor setup
-#include "SR04.h"
-#define TRIG_PIN 12
-#define ECHO_PIN 13
 
-SR04 sr04 = SR04(ECHO_PIN, TRIG_PIN);
+
+int trigPin = 12;
+int echoPin = 13;
+
+// function prototype to define default timeout value
+static unsigned int newPulseIn(const byte pin, const byte state, const unsigned long timeout = 1000000L);
+
+// using a macro to avoid function call overhead
+#define WAIT_FOR_PIN_STATE(state) \
+  while (digitalRead(pin) != (state)) { \
+    if (micros() - timestamp > timeout) { \
+      return 0; \
+    } \
+  }
+
+static unsigned int newPulseIn(const byte pin, const byte state, const unsigned long timeout) {
+  unsigned long timestamp = micros();
+  WAIT_FOR_PIN_STATE(!state);
+  WAIT_FOR_PIN_STATE(state);
+  timestamp = micros();
+  WAIT_FOR_PIN_STATE(!state);
+  return micros() - timestamp;
+}
+
 long a;
 
 //Pin Setup
@@ -76,30 +95,33 @@ void setup() {
   pinMode(buttonPin, INPUT);
   pinMode(buttonPin10, INPUT);
   pinMode(ledPin11, OUTPUT);
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
 
   m.init(); //Starting Dot Matrix
 
-  while (!Serial) {
-    digitalWrite(ledPin11, HIGH);
-    delay(150);
-    digitalWrite(ledPin11, LOW);
-    delay(150);
-  }
-  if (Serial) {
-    digitalWrite(ledPin11, HIGH);
-  }
-  //portTest();
-  //initializeCells();
-  //initializefromPort22();
+  //  while (!Serial) {
+  //    digitalWrite(ledPin11, HIGH);
+  //    delay(150);
+  //    digitalWrite(ledPin11, LOW);
+  //    delay(150);
+  //  }
+  //  if (Serial) {
+  //    digitalWrite(ledPin11, HIGH);
+  //  }
+
+//  establishContact();
+//  portTest();
+  initializeCells();
 }
 
 void loop() {
 
-  portTest();
+  //portTest();
+  statePlot();
   pauseButton();
   resetButton();
   offonPauseG();
-  //onkeypressed();
 
   proxibrightness();
   if (millis() - lastRecordedTime > interval) {
@@ -107,6 +129,29 @@ void loop() {
       iteration();
       statePlot();
       lastRecordedTime = millis();
+    }
+  }
+}
+
+//void establishContact() {
+//  while (Serial.available() <= 0) {
+//    Serial.write('A');   // send a capital A
+//    delay(300);
+//  }
+//}
+
+void initializeCells() {
+
+  for (int i = 0; i < cols; i++) {
+    for (int j = 0; j < rows; j++) {
+      float state = random (100);
+      if (state > Probability) {
+        state = 0;
+      }
+      else {
+        state = 1;
+      }
+      array1[i][j] = int(state); // Save state of each cell
     }
   }
 }
@@ -164,12 +209,19 @@ void iteration() {
 } //End of function
 
 void proxibrightness() {
-
-  a = sr04.Distance();
+  long duration, distance;
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  duration = newPulseIn(echoPin, HIGH);
+  distance = (duration / 1) / 29.1;
+  duration = newPulseIn(echoPin, LOW);
+  delay(10);
+  
   int average = 0;
 
   for (int i = 0; i < 20; i++) {
-    average = average + a;
+    average = average + distance;
   }
   average = average / 20;
   if (average < 0) {
@@ -194,26 +246,6 @@ void proxibrightness() {
     }
   }
   m.setIntensity(bright);
-}
-
-void portTest() {
-
-  pinMode(ledPin9, OUTPUT);
-
-  while (Serial.available()) { // If data is available to read,
-    serVal = Serial.read();
-  }
-  for (int i = 0; i < cols; i++) {
-    for (int j = 0; j < rows; j++) {
-      int state=0;
-      if (serVal == 1) {
-        state = 1;
-      } else if (serVal == 0) {
-        state = 0;
-      }
-      array1[i][j] = int(state);
-    }
-  }
 }
 
 void pauseButton() {
@@ -266,7 +298,7 @@ void resetButton() {
 
       // only toggle Pause if the new button state is HIGH
       if (buttonState10 == HIGH) {
-        //initializeCells();
+        initializeCells();
         //Serial.print("Reset");
       }
     }
@@ -284,22 +316,27 @@ void offonPauseG() {
   }
 }
 
-
-//void initializeCells() {
+//void portTest() {
 //
+//  pinMode(ledPin9, OUTPUT);
+//
+//  while (Serial.available()) { // If data is available to read,
+//    serVal = Serial.read();
+//  }
 //  for (int i = 0; i < cols; i++) {
 //    for (int j = 0; j < rows; j++) {
-//      float state = random (100);
-//      if (state > Probability) {
+//      int state = 0;
+//      if (serVal == 1) {
+//        state = 1;
+//      } else if (serVal == 0) {
 //        state = 0;
 //      }
-//      else {
-//        state = 1;
-//      }
-//      array1[i][j] = int(state); // Save state of each cell
+//      array1[i][j] = int(state);
 //    }
 //  }
 //}
+
+
 
 //void portTest() {       test1
 //
